@@ -1,28 +1,5 @@
 var THREE = require('zincjs').THREE;
 
-/**
- * Create a {@link Zinc.Renderer} on the dom element with corresponding elementID.
- * @param {String} elementID - id of the target dom element.
- * @returns {Zinc.Renderer}
- */
-var createRenderer = function () {
-  var WEBGL = require('../utilities/WebGL').WEBGL;
-  var localContainer = document.createElement( 'div' );
-  var localRenderer = undefined;;
-  localContainer.style.height = "100%";
-  if (WEBGL.isWebGLAvailable()) {
-    var Zinc = require('zincjs');
-    var localRenderer = new Zinc.Renderer(localContainer, window);
-    Zinc.defaultMaterialColor = 0xFFFF9C;
-    localRenderer.initialiseVisualisation();
-    localRenderer.playAnimation = false;
-  } else {
-    var warning = WEBGL.getWebGLErrorMessage();
-    localContainer.appendChild(warning);
-  }
-  return {"renderer":localRenderer, "container":localContainer};
-}
-
 var RendererModule = function()  {
   (require('./BaseModule').BaseModule).call(this);
   this.scene = undefined;
@@ -44,15 +21,15 @@ RendererModule.prototype.getIntersectedObject = function(intersects) {
 		var intersected = undefined;
 		for (var i = 0; i < intersects.length; i++) {
 			if (intersects[i] !== undefined) {
-				if (intersects[i].object) {
-          if (intersects[i].object.name)
-					  if (intersected === undefined)
-						  intersected = intersects[i];
+				if (intersects[i].object && intersects[i].object.name) {					
+					if (intersected === undefined)
+						intersected = intersects[i];
 					if (intersects[i].object.userData && 
-					  (intersects[i].object.userData.isGlyph)) {
+					  (intersects[i].object.userData.isGlyph !== undefined)) {
 						return intersects[i];
 					}
 				} 
+				
 			}
 		}
 		return intersected;
@@ -66,23 +43,15 @@ RendererModule.prototype.getAnnotationsFromObjects = function(objects) {
     	var zincObject = objects[i].userData;
       var annotation = undefined;
       if (zincObject) {
-        if (zincObject.isGlyph || zincObject.isGlyphset) {
-          var glyphset = zincObject;
-          if (zincObject.isGlyph)
-            glyphset = zincObject.getGlyphset();
-          annotation = glyphset.userData ? glyphset.userData[0] : undefined;
-          if (annotation && annotation.data) {
-            if (objects[i].name && objects[i].name != "")
-              annotation.data.id = objects[i].name;
-            else
-              annotation.data.id = glyphset.groupName;
-          }
+        if (zincObject.isGlyph) {
+          annotation = zincObject.getGlyphset().userData ? zincObject.getGlyphset().userData[0] : undefined;
+          if (annotation && annotation.data)
+            annotation.data.id = objects[i].name;
         } else {
           annotation = zincObject.userData ? zincObject.userData[0] : undefined;
-          if (annotation && annotation.data){
+          if (annotation && annotation.data)
             annotation.data.id = objects[i].name;
-          }
-        }
+        }    		
       }
       annotations[i] = annotation;
     }
@@ -109,30 +78,11 @@ RendererModule.prototype.setSelectedByObjects = function(objects, propagateChang
   return changed;
 }
 
-RendererModule.prototype.setSelectedByZincObject = function(zincObject, propagateChanges) {
-  if (zincObject && zincObject.isGlyphset) {
-    var objects = [];
-    zincObject.forEachGlyph(addGlyphToArray(objects));
-    var changed = this.graphicsHighlight.setSelected(objects);
-    if (changed && propagateChanges) {
-      var eventType = require("../utilities/eventNotifier").EVENT_TYPE.SELECTED;
-      var annotations = this.getAnnotationsFromObjects([objects[0]]);
-      this.publishChanges(annotations, eventType);
-    }
-    return changed;
-  }
-  else {
-    return this.setSelectedByObjects([zincObject ? zincObject.morph : undefined]);
-  }
-
-
-}
-
 var addGlyphToArray = function(objects) {
-  return function(glyph) {
-    objects.push(glyph.getMesh());
+    return function(glyph) {
+      objects.push(glyph.getMesh());
+    }
   }
-}
 
 RendererModule.prototype.findObjectsByGroupName = function(groupName) {
   var geometries = this.scene.findGeometriesWithGroupName(groupName);
@@ -209,7 +159,7 @@ RendererModule.prototype.getPlayRate = function(value) {
  */
 RendererModule.prototype.initialiseRenderer = function(displayAreaIn) {
   if (this.zincRenderer === undefined || this.rendererContainer === undefined) {
-    var returnedValue = createRenderer();
+    var returnedValue = (require("../utility").createRenderer)();
     this.zincRenderer = returnedValue["renderer"];
     this.rendererContainer = returnedValue["container"];
   }
